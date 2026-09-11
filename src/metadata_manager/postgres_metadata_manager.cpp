@@ -9,6 +9,13 @@ namespace duckdb {
 
 PostgresMetadataManager::PostgresMetadataManager(DuckLakeTransaction &transaction)
     : DuckLakeMetadataManager(transaction) {
+	auto &connection = transaction.GetConnection();
+	for (const auto &setting : {"SET pg_use_binary_copy=false", "SET pg_use_ctid_scan=false",
+	                            "SET pg_use_text_protocol=true",
+	                            "SET pg_use_information_schema_introspection=true"}) {
+		auto result = connection.Query(setting);
+		result->ThrowError("Failed to enable PostgreSQL text-protocol compatibility: ");
+	}
 }
 
 bool PostgresMetadataManager::TypeIsNativelySupported(const LogicalType &type) {
@@ -108,10 +115,6 @@ unique_ptr<QueryResult> PostgresMetadataManager::ExecuteQuery(DuckLakeSnapshot s
 	query = StringUtil::Replace(query, "{METADATA_PATH}", metadata_path);
 	query = StringUtil::Replace(query, "{DATA_PATH}", data_path);
 
-	if (command == "postgres_query") {
-		return connection.Query(StringUtil::Format("CALL %s(%s, %s, use_text_protocol := true)", command,
-		                                           catalog_literal, SQLString(query)));
-	}
 	return connection.Query(StringUtil::Format("CALL %s(%s, %s)", command, catalog_literal, SQLString(query)));
 }
 unique_ptr<QueryResult> PostgresMetadataManager::Execute(DuckLakeSnapshot snapshot, string &query) {
@@ -119,7 +122,7 @@ unique_ptr<QueryResult> PostgresMetadataManager::Execute(DuckLakeSnapshot snapsh
 }
 
 unique_ptr<QueryResult> PostgresMetadataManager::Query(DuckLakeSnapshot snapshot, string &query) {
-	return ExecuteQuery(snapshot, query, "postgres_query");
+	return DuckLakeMetadataManager::Query(snapshot, query);
 }
 
 string PostgresMetadataManager::GetLatestSnapshotQuery() const {
@@ -128,7 +131,7 @@ string PostgresMetadataManager::GetLatestSnapshotQuery() const {
 		'SELECT snapshot_id, schema_version, next_catalog_id, next_file_id
 		 FROM {METADATA_SCHEMA_ESCAPED}.ducklake_snapshot WHERE snapshot_id = (
 		     SELECT MAX(snapshot_id) FROM {METADATA_SCHEMA_ESCAPED}.ducklake_snapshot
-		 );', use_text_protocol := true)
+		 );')
 	)";
 }
 
@@ -140,7 +143,7 @@ string PostgresMetadataManager::GenerateFileColumnStatsCTEBody(const CTERequirem
 	return StringUtil::Format("  SELECT * FROM postgres_query({METADATA_CATALOG_NAME_LITERAL},\n"
 	                          "    'SELECT %s\n"
 	                          "     FROM {METADATA_SCHEMA_ESCAPED}.ducklake_file_column_stats\n"
-	                          "     WHERE column_id = %d AND table_id = %d', use_text_protocol := true)\n",
+	                          "     WHERE column_id = %d AND table_id = %d')\n",
 	                          select_list, req.column_field_index, table_id.index);
 }
 
