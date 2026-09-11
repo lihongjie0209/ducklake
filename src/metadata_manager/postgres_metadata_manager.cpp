@@ -108,6 +108,10 @@ unique_ptr<QueryResult> PostgresMetadataManager::ExecuteQuery(DuckLakeSnapshot s
 	query = StringUtil::Replace(query, "{METADATA_PATH}", metadata_path);
 	query = StringUtil::Replace(query, "{DATA_PATH}", data_path);
 
+	if (command == "postgres_query") {
+		return connection.Query(StringUtil::Format("CALL %s(%s, %s, use_text_protocol := true)", command,
+		                                           catalog_literal, SQLString(query)));
+	}
 	return connection.Query(StringUtil::Format("CALL %s(%s, %s)", command, catalog_literal, SQLString(query)));
 }
 unique_ptr<QueryResult> PostgresMetadataManager::Execute(DuckLakeSnapshot snapshot, string &query) {
@@ -115,7 +119,7 @@ unique_ptr<QueryResult> PostgresMetadataManager::Execute(DuckLakeSnapshot snapsh
 }
 
 unique_ptr<QueryResult> PostgresMetadataManager::Query(DuckLakeSnapshot snapshot, string &query) {
-	return DuckLakeMetadataManager::Query(snapshot, query);
+	return ExecuteQuery(snapshot, query, "postgres_query");
 }
 
 string PostgresMetadataManager::GetLatestSnapshotQuery() const {
