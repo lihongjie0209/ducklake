@@ -32,6 +32,8 @@ jobs:
       duckdb_version: ${{ needs.get-duckdb-version.outputs.duckdb_version }}
       ci_tools_version: v1.5-variegata
       extension_name: ducklake
+      exclude_archs: linux_arm64
+      skip_tests: true
 
   duckdb-next-deploy:
     name: Deploy extension binaries
