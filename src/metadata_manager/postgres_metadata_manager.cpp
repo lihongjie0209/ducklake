@@ -124,7 +124,7 @@ string PostgresMetadataManager::GetLatestSnapshotQuery() const {
 		'SELECT snapshot_id, schema_version, next_catalog_id, next_file_id
 		 FROM {METADATA_SCHEMA_ESCAPED}.ducklake_snapshot WHERE snapshot_id = (
 		     SELECT MAX(snapshot_id) FROM {METADATA_SCHEMA_ESCAPED}.ducklake_snapshot
-		 );')
+		 );', use_text_protocol := true)
 	)";
 }
 
@@ -136,7 +136,7 @@ string PostgresMetadataManager::GenerateFileColumnStatsCTEBody(const CTERequirem
 	return StringUtil::Format("  SELECT * FROM postgres_query({METADATA_CATALOG_NAME_LITERAL},\n"
 	                          "    'SELECT %s\n"
 	                          "     FROM {METADATA_SCHEMA_ESCAPED}.ducklake_file_column_stats\n"
-	                          "     WHERE column_id = %d AND table_id = %d')\n",
+	                          "     WHERE column_id = %d AND table_id = %d', use_text_protocol := true)\n",
 	                          select_list, req.column_field_index, table_id.index);
 }
 
