@@ -1,6 +1,7 @@
 #include "metadata_manager/postgres_metadata_manager.hpp"
 #include "common/ducklake_util.hpp"
 #include "duckdb/main/database.hpp"
+#include "duckdb/main/client_config.hpp"
 #include "storage/ducklake_catalog.hpp"
 #include "storage/ducklake_transaction.hpp"
 #include "storage/ducklake_metadata_info.hpp"
@@ -8,13 +9,19 @@
 namespace duckdb {
 
 PostgresMetadataManager::PostgresMetadataManager(DuckLakeTransaction &transaction)
-    : DuckLakeMetadataManager(transaction) {
-	auto &connection = transaction.GetConnection();
-	for (const auto &setting : {"SET pg_use_binary_copy=false", "SET pg_use_ctid_scan=false",
-	                            "SET pg_use_text_protocol=true",
-	                            "SET pg_use_information_schema_introspection=true"}) {
-		auto result = connection.Query(setting);
-		result->ThrowError("Failed to enable PostgreSQL text-protocol compatibility: ");
+	    : DuckLakeMetadataManager(transaction) {
+	auto &context = *transaction.GetConnection().context;
+	auto &db_config = DBConfig::GetConfig(context);
+	auto &client_config = ClientConfig::GetConfig(context);
+	for (const auto &setting : {"pg_use_binary_copy", "pg_use_ctid_scan", "pg_use_text_protocol",
+	                            "pg_use_information_schema_introspection"}) {
+		ExtensionOption option;
+		if (!db_config.TryGetExtensionOption(setting, option)) {
+			throw InvalidInputException("Required PostgreSQL compatibility setting %s is unavailable", setting);
+		}
+		const bool enabled = string(setting) == "pg_use_text_protocol" ||
+		                     string(setting) == "pg_use_information_schema_introspection";
+		client_config.user_settings.SetUserSetting(option.setting_index.GetIndex(), Value::BOOLEAN(enabled));
 	}
 }
 
